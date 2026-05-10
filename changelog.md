@@ -1,6 +1,7 @@
 # 1.4.1
 
 - Custom embed accent colors
+- New logo
 
 ## 1.4.0
 
