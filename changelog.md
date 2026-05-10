@@ -1,4 +1,8 @@
-# 1.4.0
+# 1.4.1
+
+- Custom embed accent colors
+
+## 1.4.0
 
 - New cheat detection system based on [Death Tracker](https://github.com/abb2k/death-tracker/)
 

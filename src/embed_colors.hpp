@@ -3,6 +3,7 @@
 #include <Geode/loader/Mod.hpp>
 #include <cocos2d.h>
 
+// This is such a fucking mess lmao, I will probably rework the colors in the future
 namespace embed_color {
 
 inline int fromKey(char const* key) {

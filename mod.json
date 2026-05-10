@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.4.0",
+	"version": "v1.4.1",
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
@@ -268,67 +268,67 @@
 		"color-game-open": {
 			"type": "color",
 			"name": "Game Opened",
-			"description": "Embed sidebar color for the \"Opened Geometry Dash\" message.",
+			"description": "Embed accent color for the \"Opened Geometry Dash\" webhook.",
 			"default": "#3498DB"
 		},
 		"color-game-close": {
 			"type": "color",
 			"name": "Game Closed",
-			"description": "Embed sidebar color for the \"Closed Geometry Dash\" message.",
+			"description": "Embed accent color for the \"Closed Geometry Dash\" webhook.",
 			"default": "#992D22"
 		},
 		"color-test-webhook": {
 			"type": "color",
 			"name": "Test Webhook",
-			"description": "Embed sidebar color for the test webhook message.",
+			"description": "Embed accent color for the \"Test Webhook\" message sent when the Test Webhook setting is triggered.",
 			"default": "#2ECC71"
 		},
 		"color-editor-open": {
 			"type": "color",
 			"name": "Editor Opened",
-			"description": "Embed sidebar color for the editor opened message and new level uploads.",
+			"description": "Embed accent color for opening the editor (\"Opened the Editor\") and for the default \"New Level Uploaded\".",
 			"default": "#E67E22"
 		},
 		"color-editor-exit": {
 			"type": "color",
 			"name": "Editor Exited",
-			"description": "Embed sidebar color for the editor exit message and level updates.",
+			"description": "Embed accent color when leaving the editor (Save and Play, exit with/without save, etc.) and for the default \"Level Updated\".",
 			"default": "#E74C3C"
 		},
 		"color-new-best": {
 			"type": "color",
 			"name": "New Best",
-			"description": "Embed sidebar color for new best notifications.",
+			"description": "Embed accent color for the \"New Best!\" webhook (new normal-mode best percent below 100%, after thresholds in settings).",
 			"default": "#F1C40F"
 		},
 		"color-level-complete": {
 			"type": "color",
 			"name": "Level Complete",
-			"description": "Embed sidebar color for level complete notifications.",
+			"description": "Embed accent color for normal-mode \"Level Complete!\" and startpos test-mode \"Startpos Complete!\". Practice completes use Practice Run instead.",
 			"default": "#FFD700"
 		},
 		"color-level-exit": {
 			"type": "color",
 			"name": "Level Exited",
-			"description": "Embed sidebar color for level exit notifications.",
+			"description": "Embed accent color when exiting a normal-mode run from the pause menu and endscreen (\"Exited a Level\"). Practice exits use Practice Run.",
 			"default": "#ED4245"
 		},
 		"color-death": {
 			"type": "color",
 			"name": "Death",
-			"description": "Embed sidebar color for death notifications.",
+			"description": "Embed accent color for \"Died\" webhooks (single percent or startpos segment).",
 			"default": "#C0392B"
 		},
 		"color-play-practice": {
 			"type": "color",
 			"name": "Practice Run",
-			"description": "Embed sidebar color used for practice run exits and practice level completes.",
+			"description": "Embed accent color for practice completion, pause-menu exit while in practice and endscreen exit after completing a practice run.",
 			"default": "#95A5A6"
 		},
 		"color-play-normal": {
 			"type": "color",
 			"name": "Normal Run",
-			"description": "Embed sidebar color used for normal mode level completes.",
+			"description": "Embed accent color for the \"Playing a Level\" webhook.",
 			"default": "#57F287"
 		},
 		"extra-webhook-urls-title": {

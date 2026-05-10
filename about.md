@@ -2,12 +2,16 @@
 
 Show other people what you are doing by automatically sending Discord webhook messages when you take common actions, such as playing a level or opening the editor. More options may be added later :3
 
+---
+
 ## Setup guide
 
 1. Create a Discord webhook (there's guides on YouTube)
 2. Copy the webhook url
 3. Hop on geode and get to this mod's settings page
 4. Paste the url into the `Webhook URL` text box
+
+---
 
 ## Profile manager
 
@@ -18,6 +22,8 @@ Don't forget to save a profile after you add/remove a level from the ID filter!
 - **Load** applies a saved slot, updates the active custom text file, and closes settings popups. Slot 1's file is used until you load another.
 - **Rename** changes the slot's display name.
 - **Delete** clears that slot. If its custom text slot was active, slot 1's file becomes active.
+
+---
 
 ## Currently logged actions
 
@@ -32,6 +38,8 @@ There's also options to resize/disable sending screenshots.
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
 - **Level Upload or Update** (this isn't filtered by blacklist/whitelist yet) (by [MalikHw47](https://youtube.com/@MalikHw47))
 
+---
+
 ## Community features
 
 These are under **Other Notification Toggles** and below it.
@@ -41,6 +49,8 @@ These are under **Other Notification Toggles** and below it.
 - **Level ID filter** (All/Blacklist/Whitelist. Online levels use the check beside Favorite and Settings, Editor/local uses the check beside the level info button) (requested by many people)
 - **Startpos progress** (minimum percentage from your startpos until death or completion, applies to death messages and **Startpos Complete**) (requested by Manscapers Discord server)
 - **Extra URL slots** (In case you want to like let 5 servers/channels know what you're doing)
+
+---
 
 ## Privacy / Security note
 
