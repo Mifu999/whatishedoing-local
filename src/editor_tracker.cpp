@@ -47,7 +47,7 @@ void sendEditorExitWebhook(std::string const& actionTitle) {
             "{} left the editor.",
             playerName
         ),
-        embed_color::kEditorExit,
+        embed_color::editorExit(),
         fields,
         elapsed
     );
@@ -102,7 +102,7 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer) {
                 display.levelName,
                 display.creatorName
             ),
-            embed_color::kEditorOpen,
+            embed_color::editorOpen(),
             fields
         );
         return true;

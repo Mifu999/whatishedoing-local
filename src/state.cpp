@@ -45,8 +45,8 @@ std::string LevelSession::completeTitle() const {
 }
 
 int LevelSession::color() const {
-    if (practice) return embed_color::kPlayPractice;
-    return embed_color::kPlayNormal;
+    if (practice) return embed_color::playPractice();
+    return embed_color::playNormal();
 }
 
 void LevelSession::reset() {

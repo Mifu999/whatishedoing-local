@@ -24,7 +24,7 @@ class $modify(UploadPopup) {
             sendWebhookDirect(
                 isUpdate ? "Level Updated" : "New Level Uploaded",
                 content,
-                isUpdate ? embed_color::kEditorExit : embed_color::kEditorOpen
+                isUpdate ? embed_color::editorExit() : embed_color::editorOpen()
             );
         }
     }

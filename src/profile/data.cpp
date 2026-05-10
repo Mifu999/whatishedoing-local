@@ -16,7 +16,7 @@ constexpr char const* kProfileNamesKey = "profile-names";
 constexpr char const* kActiveCustomTextSlotKey = "active-custom-text-slot";
 constexpr std::size_t kMaxNameLength = 32;
 
-std::array<TrackedKey, 31> const kTracked{{
+std::array<TrackedKey, 42> const kTracked{{
     {"webhook-url", Kind::String},
     {"extra-webhook-url-1", Kind::String},
     {"extra-webhook-url-2", Kind::String},
@@ -48,6 +48,17 @@ std::array<TrackedKey, 31> const kTracked{{
     {"upload-use-custom-text", Kind::Bool},
     {"upload-role-ping", Kind::Bool},
     {"upload-role-id", Kind::String},
+    {"color-game-open", Kind::Color},
+    {"color-game-close", Kind::Color},
+    {"color-test-webhook", Kind::Color},
+    {"color-editor-open", Kind::Color},
+    {"color-editor-exit", Kind::Color},
+    {"color-new-best", Kind::Color},
+    {"color-level-complete", Kind::Color},
+    {"color-level-exit", Kind::Color},
+    {"color-death", Kind::Color},
+    {"color-play-practice", Kind::Color},
+    {"color-play-normal", Kind::Color},
 }};
 
 std::string defaultNameFor(std::size_t idx) {
@@ -92,6 +103,16 @@ matjson::Value snapshotCurrentSettings() {
                 out[t.key] =
                     Mod::get()->getSettingValue<std::string>(t.key);
                 break;
+            case Kind::Color: {
+                auto c = Mod::get()
+                             ->getSettingValue<cocos2d::ccColor3B>(t.key);
+                auto obj = matjson::Value::object();
+                obj["r"] = static_cast<int64_t>(c.r);
+                obj["g"] = static_cast<int64_t>(c.g);
+                obj["b"] = static_cast<int64_t>(c.b);
+                out[t.key] = obj;
+                break;
+            }
         }
     }
     return out;
@@ -130,13 +151,29 @@ void applyBlobToSettings(matjson::Value const& blob) {
                 }
                 break;
             }
+            case Kind::Color: {
+                if (!v.isObject()) break;
+                if (!v.contains("r") || !v.contains("g") || !v.contains("b"))
+                    break;
+                auto rr = v["r"].asInt();
+                auto gg = v["g"].asInt();
+                auto bb = v["b"].asInt();
+                if (!rr.isOk() || !gg.isOk() || !bb.isOk()) break;
+                cocos2d::ccColor3B c{
+                    static_cast<GLubyte>(rr.unwrap()),
+                    static_cast<GLubyte>(gg.unwrap()),
+                    static_cast<GLubyte>(bb.unwrap()),
+                };
+                Mod::get()->setSettingValue<cocos2d::ccColor3B>(t.key, c);
+                break;
+            }
         }
     }
 }
 
 } // namespace
 
-std::array<TrackedKey, 31> const& trackedKeys() {
+std::array<TrackedKey, 42> const& trackedKeys() {
     return kTracked;
 }
 

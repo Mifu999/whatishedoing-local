@@ -187,7 +187,7 @@ void sendDeathWebhookIfNeeded(
                         display.levelName,
                         display.creatorName
                     ),
-                    embed_color::kDeath,
+                    embed_color::death(),
                     {
                         {"Level", display.levelName, true},
                         {"Creator", display.creatorName, true},
@@ -212,7 +212,7 @@ void sendDeathWebhookIfNeeded(
                         display.levelName,
                         display.creatorName
                     ),
-                    embed_color::kDeath,
+                    embed_color::death(),
                     {
                         {"Level", display.levelName, true},
                         {"Creator", display.creatorName, true},
@@ -308,7 +308,7 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
                     display.levelName,
                     display.creatorName
                 ),
-                embed_color::kNewBest,
+                embed_color::newBest(),
                 {
                     {"Level", display.levelName, true},
                     {"Creator", display.creatorName, true},
@@ -386,7 +386,7 @@ void sendCompletedLevelExitIfQueued(PlayLayer* layer) {
         "notify-play-level",
         pending.practice ? "Exited a Practice Run" : "Exited a Level",
         fmt::format("{} exited **{}**.", playerName, display.levelName),
-        pending.practice ? embed_color::kPlayPractice : embed_color::kLevelExit,
+        pending.practice ? embed_color::playPractice() : embed_color::levelExit(),
         {
             {"Level", display.levelName, true},
             {"Creator", display.creatorName, true},
@@ -659,7 +659,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto const completeColor =
             pre.practice
                 ? pre.color()
-                : embed_color::kLevelComplete;
+                : embed_color::levelComplete();
         bool const fromStartpos = m_isTestMode && !pre.practice;
         int const sessionLevelID = pre.levelID;
         std::string const sessionLevelName = pre.levelName;
@@ -854,7 +854,7 @@ class $modify(MyPlayLayer, PlayLayer) {
                 ),
                 session.practice
                     ? session.color()
-                    : embed_color::kLevelExit,
+                    : embed_color::levelExit(),
                 {
                     {"Level", display.levelName, true},
                     {"Creator", display.creatorName, true},

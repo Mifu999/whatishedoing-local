@@ -261,6 +261,76 @@
 			"description": "When on, any level message that would otherwise be sent as \"Private level\" (because of the filter mode above) is dropped entirely instead of sent. Use this for full privacy on filtered levels. Affects level start, exit, complete, death, new best, and editor open/exit.",
 			"default": false
 		},
+		"embed-colors-title": {
+			"type": "title",
+			"name": "Embed Colors"
+		},
+		"color-game-open": {
+			"type": "color",
+			"name": "Game Opened",
+			"description": "Embed sidebar color for the \"Opened Geometry Dash\" message.",
+			"default": "#3498DB"
+		},
+		"color-game-close": {
+			"type": "color",
+			"name": "Game Closed",
+			"description": "Embed sidebar color for the \"Closed Geometry Dash\" message.",
+			"default": "#992D22"
+		},
+		"color-test-webhook": {
+			"type": "color",
+			"name": "Test Webhook",
+			"description": "Embed sidebar color for the test webhook message.",
+			"default": "#2ECC71"
+		},
+		"color-editor-open": {
+			"type": "color",
+			"name": "Editor Opened",
+			"description": "Embed sidebar color for the editor opened message and new level uploads.",
+			"default": "#E67E22"
+		},
+		"color-editor-exit": {
+			"type": "color",
+			"name": "Editor Exited",
+			"description": "Embed sidebar color for the editor exit message and level updates.",
+			"default": "#E74C3C"
+		},
+		"color-new-best": {
+			"type": "color",
+			"name": "New Best",
+			"description": "Embed sidebar color for new best notifications.",
+			"default": "#F1C40F"
+		},
+		"color-level-complete": {
+			"type": "color",
+			"name": "Level Complete",
+			"description": "Embed sidebar color for level complete notifications.",
+			"default": "#FFD700"
+		},
+		"color-level-exit": {
+			"type": "color",
+			"name": "Level Exited",
+			"description": "Embed sidebar color for level exit notifications.",
+			"default": "#ED4245"
+		},
+		"color-death": {
+			"type": "color",
+			"name": "Death",
+			"description": "Embed sidebar color for death notifications.",
+			"default": "#C0392B"
+		},
+		"color-play-practice": {
+			"type": "color",
+			"name": "Practice Run",
+			"description": "Embed sidebar color used for practice run exits and practice level completes.",
+			"default": "#95A5A6"
+		},
+		"color-play-normal": {
+			"type": "color",
+			"name": "Normal Run",
+			"description": "Embed sidebar color used for normal mode level completes.",
+			"default": "#57F287"
+		},
 		"extra-webhook-urls-title": {
 			"type": "title",
 			"name": "Extra Webhook URLs"

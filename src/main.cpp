@@ -29,7 +29,7 @@ $execute
                         "{} opened Geometry Dash!",
                         playerName
                     ),
-                    embed_color::kGameOpen
+                    embed_color::gameOpen()
                 );
             }
         )
@@ -62,7 +62,7 @@ $execute
                             "{} closed Geometry Dash.",
                             playerName
                         ),
-                        embed_color::kGameClose,
+                        embed_color::gameClose(),
                         {},
                         footer
                     );
@@ -73,7 +73,7 @@ $execute
                             "{} closed Geometry Dash.",
                             playerName
                         ),
-                        embed_color::kGameClose,
+                        embed_color::gameClose(),
                         {},
                         footer
                     );
@@ -120,7 +120,7 @@ $on_mod(Loaded)
                 "{} is testing the webhook!",
                 playerName
             ),
-            embed_color::kTestWebhook
+            embed_color::testWebhook()
         );
         Mod::get()->setSettingValue<bool>("test-webhook", false);
     });

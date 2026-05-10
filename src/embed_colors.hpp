@@ -1,20 +1,27 @@
 #pragma once
 
+#include <Geode/loader/Mod.hpp>
+#include <cocos2d.h>
+
 namespace embed_color {
 
-inline constexpr int kGameClose = 0x992D22;
-inline constexpr int kGameOpen = 0x3498DB;
-inline constexpr int kTestWebhook = 0x2ECC71;
+inline int fromKey(char const* key) {
+    auto c = geode::Mod::get()->getSettingValue<cocos2d::ccColor3B>(key);
+    return (static_cast<int>(c.r) << 16)
+         | (static_cast<int>(c.g) << 8)
+         | static_cast<int>(c.b);
+}
 
-inline constexpr int kEditorOpen = 0xE67E22;
-inline constexpr int kEditorExit = 0xE74C3C;
-
-inline constexpr int kNewBest = 0xF1C40F;
-inline constexpr int kLevelComplete = 0xFFD700;
-inline constexpr int kLevelExit = 0xED4245;
-inline constexpr int kDeath = 0xC0392B;
-
-inline constexpr int kPlayPractice = 0x95A5A6;
-inline constexpr int kPlayNormal = 0x57F287;
+inline int gameClose()     { return fromKey("color-game-close"); }
+inline int gameOpen()      { return fromKey("color-game-open"); }
+inline int testWebhook()   { return fromKey("color-test-webhook"); }
+inline int editorOpen()    { return fromKey("color-editor-open"); }
+inline int editorExit()    { return fromKey("color-editor-exit"); }
+inline int newBest()       { return fromKey("color-new-best"); }
+inline int levelComplete() { return fromKey("color-level-complete"); }
+inline int levelExit()     { return fromKey("color-level-exit"); }
+inline int death()         { return fromKey("color-death"); }
+inline int playPractice()  { return fromKey("color-play-practice"); }
+inline int playNormal()    { return fromKey("color-play-normal"); }
 
 } // namespace embed_color
