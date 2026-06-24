@@ -1,0 +1,930 @@
+#include <Geode/Geode.hpp>
+#include <Geode/binding/EndLevelLayer.hpp>
+#include <Geode/binding/GJGameLevel.hpp>
+#include <Geode/binding/PlayLayer.hpp>
+#include <Geode/modify/EndLevelLayer.hpp>
+#include <Geode/modify/PlayLayer.hpp>
+#include <Geode/utils/general.hpp>
+#include <Geode/utils/string.hpp>
+#include <cmath>
+#include <deque>
+#include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "embed_colors.hpp"
+#include "screenshot.hpp"
+#include "state.hpp"
+#include "webhook.hpp"
+
+using namespace geode::prelude;
+
+namespace {
+
+struct PendingCompletedLevelExit {
+    PlayLayer* layer = nullptr;
+    int levelID = kLevelSessionClearedId;
+    std::string levelName;
+    std::string creatorName;
+    bool practice = false;
+    int64_t elapsedMs = 0;
+    Clock::time_point attemptStart;
+};
+
+std::optional<PendingCompletedLevelExit> s_pendingCompletedLevelExit;
+std::optional<PendingCompletedLevelExit> s_sentCompletedLevelExit;
+
+void syncPlayMode(PlayLayer* layer) {
+    auto& session = levelSession();
+    session.practice = layer->m_isPracticeMode;
+}
+
+bool matchesLevelSession(
+    int levelID,
+    std::string const& levelName,
+    Clock::time_point attemptStart
+) {
+    auto const& s = levelSession();
+    return s.active
+        && s.levelID == levelID
+        && s.levelName == levelName
+        && s.attemptStart == attemptStart;
+}
+
+void queueStartposSegmentStart(PlayLayer* layer) {
+    if (!layer || !layer->m_level || !layer->m_isTestMode) {
+        return;
+    }
+    if (layer->m_isPracticeMode) {
+        return;
+    }
+    auto const levelID = EditorIDs::getID(layer->m_level);
+    std::string const levelName = std::string(layer->m_level->m_levelName);
+    auto const attemptStart = levelSession().attemptStart;
+    int const startPercent = static_cast<int>(layer->getCurrentPercent());
+    geode::queueInMainThread(
+        [layer, levelID, levelName, attemptStart, startPercent] {
+            auto* activeLayer = PlayLayer::get();
+            if (activeLayer != layer || !activeLayer->m_level) {
+                return;
+            }
+            if (!activeLayer->m_isTestMode || activeLayer->m_isPracticeMode) {
+                return;
+            }
+            if (!matchesLevelSession(levelID, levelName, attemptStart)) {
+                return;
+            }
+            auto& s = levelSession();
+            s.startPercent = startPercent;
+            s.bestNotifiedPercent = s.startPercent;
+        }
+    );
+}
+
+int screenshotScalePercent() {
+    return static_cast<int>(
+        Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent")
+    );
+}
+
+void reopenLevelSessionIfNeeded(PlayLayer* layer) {
+    auto& session = levelSession();
+    if (session.active || !layer->m_level) {
+        return;
+    }
+    auto* level = layer->m_level;
+    session.levelID = EditorIDs::getID(level);
+    session.levelName = std::string(level->m_levelName);
+    session.creatorName =
+        displayCreatorName(std::string(level->m_creatorName));
+    session.accumulated = Milliseconds::zero();
+    session.attemptStart = Clock::now();
+    session.active = true;
+    session.startPercent =
+        static_cast<int>(level->m_normalPercent.value());
+    session.bestNotifiedPercent = session.startPercent;
+    syncPlayMode(layer);
+    if (layer->m_isTestMode) {
+        queueStartposSegmentStart(layer);
+    }
+}
+
+void sendDeathWebhookIfNeeded(
+    PlayLayer* layer,
+    int currentPercent,
+    int bestBefore
+) {
+    auto& session = levelSession();
+    if (!session.active || !layer || !layer->m_level) {
+        return;
+    }
+    if (session.deathNotified) {
+        return;
+    }
+    if (session.practice) {
+        return;
+    }
+    if (layer->m_level->isPlatformer()) {
+        return;
+    }
+    if (currentPercent <= 0) {
+        return;
+    }
+    if (currentPercent >= 100) {
+        return;
+    }
+    bool const fromStartpos = layer->m_isTestMode;
+    if (!fromStartpos && currentPercent > bestBefore) {
+        if (Mod::get()->getSettingValue<bool>("notify-new-best")) {
+            return;
+        }
+    }
+    if (fromStartpos) {
+        auto const minSeg = static_cast<int>(Mod::get()->getSettingValue<int64_t>(
+            "startpos-death-min-progress"
+        ));
+        int const progress = currentPercent - session.startPercent;
+        if (progress < 0) {
+            return;
+        }
+        if (progress < minSeg) {
+            return;
+        }
+    } else {
+        auto const minPct = static_cast<int>(
+            Mod::get()->getSettingValue<int64_t>("death-min-percent")
+        );
+        if (currentPercent < minPct) {
+            return;
+        }
+    }
+    auto const playerName = getPlayerName();
+    auto const display = resolveLevelDisplay(
+        EditorIDs::getID(layer->m_level),
+        std::string(layer->m_level->m_levelName),
+        std::string(layer->m_level->m_creatorName)
+    );
+    if (display.redacted &&
+        Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        session.deathNotified = true;
+        return;
+    }
+    int const deathStartPct = session.startPercent;
+    int const sessionLevelID = session.levelID;
+    std::string const sessionLevelName = session.levelName;
+    auto const sessionAttemptStart = session.attemptStart;
+    auto sendDeath =
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
+            if (fromStartpos) {
+                sendWebhookDirect(
+                    "Died",
+                    fmt::format(
+                        "{} got a **{}-{}%** run on **{}** by **{}**.",
+                        playerName,
+                        deathStartPct,
+                        currentPercent,
+                        display.levelName,
+                        display.creatorName
+                    ),
+                    embed_color::death(),
+                    {
+                        {"Level", display.levelName, true},
+                        {"Creator", display.creatorName, true},
+                        {"Run",
+                         fmt::format(
+                             "{}-{}%",
+                             deathStartPct,
+                             currentPercent
+                         ),
+                         true},
+                    },
+                    "",
+                    std::move(shot)
+                );
+            } else {
+                sendWebhookDirect(
+                    "Died",
+                    fmt::format(
+                        "{} died at **{}%** on **{}** by **{}**.",
+                        playerName,
+                        currentPercent,
+                        display.levelName,
+                        display.creatorName
+                    ),
+                    embed_color::death(),
+                    {
+                        {"Level", display.levelName, true},
+                        {"Creator", display.creatorName, true},
+                        {"Percent", fmt::format("{}%", currentPercent), true},
+                    },
+                    "",
+                    std::move(shot)
+                );
+            }
+            if (matchesLevelSession(
+                    sessionLevelID,
+                    sessionLevelName,
+                    sessionAttemptStart
+                )) {
+                levelSession().deathNotified = true;
+            }
+        };
+    if (!Mod::get()->getSettingValue<bool>("screenshot-death")) {
+        sendDeath(std::nullopt);
+        return;
+    }
+    auto capOpt = capturePlayLayerScreenshotRgba(layer);
+    if (!capOpt) {
+        sendDeath(std::nullopt);
+        return;
+    }
+    spawnScreenshotEncodeToPngThen(
+        std::move(*capOpt),
+        screenshotScalePercent(),
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
+            sendDeath(std::move(shot));
+        }
+    );
+}
+
+void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
+    if (!Mod::get()->getSettingValue<bool>("notify-new-best")) {
+        return;
+    }
+    if (!playLayer || !playLayer->m_level) {
+        return;
+    }
+    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode) {
+        return;
+    }
+    auto* level = playLayer->m_level;
+    auto& session = levelSession();
+    if (!session.active) {
+        return;
+    }
+    if (session.levelID != EditorIDs::getID(level)) {
+        return;
+    }
+    if (session.practice) {
+        return;
+    }
+    auto const currentBest =
+        static_cast<int>(level->m_newNormalPercent2.value());
+    if (currentBest <= session.bestNotifiedPercent) {
+        return;
+    }
+    if (currentBest <= session.startPercent) {
+        return;
+    }
+    if (currentBest >= 100) {
+        return;
+    }
+    auto const minPct = static_cast<int>(
+        Mod::get()->getSettingValue<int64_t>("new-best-min-percent")
+    );
+    if (currentBest < minPct) {
+        return;
+    }
+    auto const playerName = getPlayerName();
+    auto const display = resolveLevelDisplay(
+        EditorIDs::getID(level),
+        std::string(level->m_levelName),
+        std::string(level->m_creatorName)
+    );
+    if (display.redacted &&
+        Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        return;
+    }
+    session.bestNotifiedPercent = currentBest;
+    auto sendNewBest =
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
+            sendWebhookDirect(
+                "New Best!",
+                fmt::format(
+                    "{} reached a new best of **{}%** on **{}** by **{}**.",
+                    playerName,
+                    currentBest,
+                    display.levelName,
+                    display.creatorName
+                ),
+                embed_color::newBest(),
+                {
+                    {"Level", display.levelName, true},
+                    {"Creator", display.creatorName, true},
+                    {"Best", fmt::format("{}%", currentBest), true},
+                },
+                "",
+                std::move(shot)
+            );
+        };
+    if (!Mod::get()->getSettingValue<bool>("screenshot-new-best")) {
+        sendNewBest(std::nullopt);
+        return;
+    }
+    auto capOpt = capturePlayLayerScreenshotRgba(playLayer);
+    if (!capOpt) {
+        sendNewBest(std::nullopt);
+        return;
+    }
+    spawnScreenshotEncodeToPngThen(
+        std::move(*capOpt),
+        screenshotScalePercent(),
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
+            sendNewBest(std::move(shot));
+        }
+    );
+}
+
+void queueCompletedLevelExit(
+    PlayLayer* layer,
+    LevelSession const& session,
+    int64_t elapsedMs
+) {
+    s_pendingCompletedLevelExit = PendingCompletedLevelExit{
+        layer,
+        session.levelID,
+        session.levelName,
+        session.creatorName,
+        session.practice,
+        elapsedMs,
+        session.attemptStart,
+    };
+}
+
+void clearCompletedLevelExit(PlayLayer* layer) {
+    if (s_pendingCompletedLevelExit &&
+        s_pendingCompletedLevelExit->layer == layer) {
+        s_pendingCompletedLevelExit.reset();
+    }
+    if (s_sentCompletedLevelExit &&
+        s_sentCompletedLevelExit->layer == layer) {
+        s_sentCompletedLevelExit.reset();
+    }
+}
+
+void sendCompletedLevelExitIfQueued(PlayLayer* layer) {
+    if (!s_pendingCompletedLevelExit ||
+        s_pendingCompletedLevelExit->layer != layer) {
+        return;
+    }
+    auto pending = std::move(*s_pendingCompletedLevelExit);
+    s_pendingCompletedLevelExit.reset();
+    s_sentCompletedLevelExit = pending;
+    auto const display = resolveLevelDisplay(
+        pending.levelID,
+        pending.levelName,
+        pending.creatorName
+    );
+    bool const suppress = display.redacted &&
+        Mod::get()->getSettingValue<bool>("suppress-redacted");
+    if (suppress) {
+        return;
+    }
+    auto const playerName = getPlayerName();
+    sendWebhook(
+        "notify-play-level",
+        pending.practice ? "Exited a Practice Run" : "Exited a Level",
+        fmt::format("{} exited **{}**.", playerName, display.levelName),
+        pending.practice ? embed_color::playPractice() : embed_color::levelExit(),
+        {
+            {"Level", display.levelName, true},
+            {"Creator", display.creatorName, true},
+        },
+        formatDurationMs(pending.elapsedMs)
+    );
+}
+
+bool consumeSentCompletedLevelExit(PlayLayer* layer) {
+    if (!s_sentCompletedLevelExit ||
+        s_sentCompletedLevelExit->layer != layer) {
+        return false;
+    }
+    auto const& sent = *s_sentCompletedLevelExit;
+    if (!matchesLevelSession(sent.levelID, sent.levelName, sent.attemptStart)) {
+        return false;
+    }
+    s_sentCompletedLevelExit.reset();
+    levelSession().reset();
+    return true;
+}
+
+void markCurrentBestHandled(PlayLayer* playLayer) {
+    if (!playLayer || !playLayer->m_level) {
+        return;
+    }
+    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode) {
+        return;
+    }
+    auto* level = playLayer->m_level;
+    auto& session = levelSession();
+    if (!session.active) {
+        return;
+    }
+    if (session.levelID != EditorIDs::getID(level)) {
+        return;
+    }
+    if (session.practice) {
+        return;
+    }
+    int const currentBest =
+        static_cast<int>(level->m_newNormalPercent2.value());
+    if (currentBest > session.bestNotifiedPercent) {
+        session.bestNotifiedPercent = currentBest;
+    }
+}
+} // namespace
+
+class $modify(MyPlayLayer, PlayLayer) {
+    struct Fields {
+        bool noclip = false;
+        bool speedhack = false;
+        CCObject* disabledCheat = nullptr;
+        std::optional<Clock::time_point> speedhackCompare;
+        std::deque<double> realTimeHistory;
+        std::deque<double> gameTimeHistory;
+        double rollingRealSum = 0;
+        double rollingGameSum = 0;
+        double currentTimeWarp = 1;
+    };
+
+    static void onModify(auto& self) {
+        (void)self.setHookPriorityPre("PlayLayer::destroyPlayer", Priority::First);
+    }
+
+    void resetSpeedhackSamples() {
+        m_fields->realTimeHistory.clear();
+        m_fields->gameTimeHistory.clear();
+        m_fields->rollingRealSum = 0;
+        m_fields->rollingGameSum = 0;
+        m_fields->speedhackCompare = std::nullopt;
+    }
+
+    void clearCheatState() {
+        m_fields->noclip = false;
+        m_fields->speedhack = false;
+        m_fields->disabledCheat = nullptr;
+        resetSpeedhackSamples();
+    }
+
+    bool isProgressLegal() {
+        if (!Mod::get()->getSettingValue<bool>("cheat-detect")) {
+            return true;
+        }
+        return !m_fields->noclip
+            && !m_isIgnoreDamageEnabled
+            && !m_ignoreDamage
+            && !m_fields->speedhack;
+    }
+
+    void checkSpeedhackDelta(float dt) {
+        if (!Mod::get()->getSettingValue<bool>("cheat-detect")) {
+            resetSpeedhackSamples();
+            return;
+        }
+        if (!levelSession().active || m_levelEndAnimationStarted) {
+            resetSpeedhackSamples();
+            return;
+        }
+        if (!m_player1 || m_player1->m_isDead || m_isPaused) {
+            return;
+        }
+        auto const now = Clock::now();
+        if (!m_fields->speedhackCompare.has_value()) {
+            m_fields->speedhackCompare = now;
+            return;
+        }
+        std::chrono::duration<double> const realElapsed =
+            now - m_fields->speedhackCompare.value();
+        m_fields->speedhackCompare = now;
+        double const realDt = realElapsed.count();
+        if (realDt > 0.2) {
+            return;
+        }
+        double const gameDt = static_cast<double>(dt);
+        if (realDt <= 0 || gameDt <= 0) {
+            return;
+        }
+        m_fields->rollingRealSum += realDt;
+        m_fields->rollingGameSum += gameDt;
+        m_fields->realTimeHistory.push_back(realDt);
+        m_fields->gameTimeHistory.push_back(gameDt);
+        constexpr std::size_t kMaxSamples = 120;
+        if (m_fields->realTimeHistory.size() > kMaxSamples) {
+            m_fields->rollingRealSum -= m_fields->realTimeHistory.front();
+            m_fields->rollingGameSum -= m_fields->gameTimeHistory.front();
+            m_fields->realTimeHistory.pop_front();
+            m_fields->gameTimeHistory.pop_front();
+        }
+        if (m_fields->realTimeHistory.size() < 30 ||
+            m_fields->rollingRealSum == 0) {
+            return;
+        }
+        double const currentRatio =
+            m_fields->rollingGameSum / m_fields->rollingRealSum;
+        double const expectedRatio = m_fields->currentTimeWarp;
+        if (std::abs(currentRatio - expectedRatio) > 0.05) {
+            if (!m_fields->speedhack) {
+                log::warn("Speedhack detected");
+                m_fields->speedhack = true;
+            }
+        }
+    }
+
+    bool init(
+        GJGameLevel* level,
+        bool useReplay,
+        bool dontCreateObjects
+    ) {
+        clearCompletedLevelExit(this);
+        auto& session = levelSession();
+        std::string const levelName =
+            level ? std::string(level->m_levelName) : "";
+        int const levelID = level
+            ? EditorIDs::getID(level)
+            : kLevelSessionClearedId;
+        bool const isContinuation = level
+            && session.active
+            && session.levelID == levelID
+            && session.levelName == levelName;
+        if (!PlayLayer::init(level, useReplay, dontCreateObjects)) {
+            return false;
+        }
+        if (!level) {
+            levelSession().reset();
+            return true;
+        }
+        auto const creatorName = std::string(level->m_creatorName);
+        auto const creatorDisplayName = displayCreatorName(creatorName);
+        if (isContinuation) {
+            session.accumulated +=
+                std::chrono::duration_cast<Milliseconds>(
+                    Clock::now() - session.attemptStart
+                );
+        } else {
+            session.accumulated = Milliseconds::zero();
+            session.levelID = levelID;
+        }
+        session.attemptStart = Clock::now();
+        session.levelName = levelName;
+        session.creatorName = creatorDisplayName;
+        session.active = true;
+        syncPlayMode(this);
+        if (m_isTestMode) {
+            session.startPercent =
+                static_cast<int>(level->m_normalPercent.value());
+            session.bestNotifiedPercent = session.startPercent;
+            queueStartposSegmentStart(this);
+        } else {
+            session.startPercent =
+                static_cast<int>(level->m_normalPercent.value());
+            session.bestNotifiedPercent = session.startPercent;
+        }
+        auto const playerName = getPlayerName();
+        if (!isContinuation) {
+            auto const display = resolveLevelDisplay(
+                levelID,
+                levelName,
+                creatorName
+            );
+            if (display.redacted &&
+                Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+                return true;
+            }
+            std::vector<WebhookField> fields = {
+                {"Level", display.levelName, true},
+                {"Creator", display.creatorName, true},
+            };
+            if (display.showLevelID) {
+                fields.push_back(
+                    {"Level ID", geode::utils::numToString(levelID), true}
+                );
+            }
+            sendWebhook(
+                session.settingKey(),
+                session.startTitle(),
+                fmt::format(
+                    "{} is now playing **{}** by **{}**.",
+                    playerName,
+                    display.levelName,
+                    display.creatorName
+                ),
+                session.color(),
+                fields
+            );
+        }
+        return true;
+    }
+    void resetLevel() {
+        resetSpeedhackSamples();
+        PlayLayer::resetLevel();
+        reopenLevelSessionIfNeeded(this);
+        if (m_isTestMode && m_level) {
+            queueStartposSegmentStart(this);
+        }
+        levelSession().deathNotified = false;
+        clearCheatState();
+    }
+    void togglePracticeMode(bool practiceMode) {
+        PlayLayer::togglePracticeMode(practiceMode);
+        if (practiceMode) {
+            reopenLevelSessionIfNeeded(this);
+        }
+        auto& session = levelSession();
+        if (!session.active) {
+            return;
+        }
+        syncPlayMode(this);
+    }
+    void levelComplete() {
+        syncPlayMode(this);
+        auto& pre = levelSession();
+        if (!pre.active) {
+            PlayLayer::levelComplete();
+            return;
+        }
+        if (!m_level) {
+            PlayLayer::levelComplete();
+            pre.reset();
+            return;
+        }
+        auto const elapsedMs = pre.elapsedMilliseconds();
+        auto const elapsed = formatDurationMs(elapsedMs);
+        auto const display = resolveLevelDisplay(
+            EditorIDs::getID(m_level),
+            std::string(m_level->m_levelName),
+            std::string(m_level->m_creatorName)
+        );
+        auto const playerName = getPlayerName();
+        auto const completeColor =
+            pre.practice
+                ? pre.color()
+                : embed_color::levelComplete();
+        bool const fromStartpos = m_isTestMode && !pre.practice;
+        int const sessionLevelID = pre.levelID;
+        std::string const sessionLevelName = pre.levelName;
+        auto const sessionAttemptStart = pre.attemptStart;
+        std::string const completeTitleSnapshot = pre.completeTitle();
+        PlayLayer::levelComplete();
+        bool const progressLegal = isProgressLegal();
+        if (progressLegal) {
+            sendNewBestWebhookIfNeeded(this);
+        } else {
+            markCurrentBestHandled(this);
+        }
+        bool const suppress = display.redacted &&
+            Mod::get()->getSettingValue<bool>("suppress-redacted");
+        if (!suppress) {
+            queueCompletedLevelExit(this, pre, elapsedMs);
+        }
+        if (!suppress && progressLegal) {
+            if (fromStartpos) {
+                auto* layer = this;
+                geode::queueInMainThread(
+                    [=] {
+                        if (!progressLegal) {
+                            return;
+                        }
+                        if (!matchesLevelSession(
+                                sessionLevelID,
+                                sessionLevelName,
+                                sessionAttemptStart
+                            )) {
+                            return;
+                        }
+                        auto const minSeg = static_cast<int>(
+                            Mod::get()->getSettingValue<int64_t>(
+                                "startpos-death-min-progress"
+                            ));
+                        int const completeStartPercentSnapshot =
+                            levelSession().startPercent;
+                        int const progress =
+                            100 - completeStartPercentSnapshot;
+                        if (progress >= 0 && progress >= minSeg) {
+                            auto fireWebhook =
+                                [=](std::optional<
+                                    std::vector<std::uint8_t>> shot) {
+                                    sendWebhook(
+                                        "notify-level-complete",
+                                        "Startpos Complete!",
+                                        fmt::format(
+                                            "{} got a **{}-{}%** run on "
+                                            "**{}** by **{}**.",
+                                            playerName,
+                                            completeStartPercentSnapshot,
+                                            100,
+                                            display.levelName,
+                                            display.creatorName
+                                        ),
+                                        completeColor,
+                                        {
+                                            {
+                                                "Level",
+                                                display.levelName,
+                                                true
+                                            },
+                                            {
+                                                "Creator",
+                                                display.creatorName,
+                                                true
+                                            },
+                                            {
+                                                "Run",
+                                                fmt::format(
+                                                    "{}-100%",
+                                                    completeStartPercentSnapshot
+                                                ),
+                                                true
+                                            },
+                                        },
+                                        elapsed,
+                                        std::move(shot)
+                                    );
+                                };
+                            if (!Mod::get()->getSettingValue<bool>(
+                                    "screenshot-level-complete"
+                                )) {
+                                fireWebhook(std::nullopt);
+                            } else if (PlayLayer::get() != layer) {
+                                fireWebhook(std::nullopt);
+                            } else {
+                                auto capOpt =
+                                    capturePlayLayerScreenshotRgba(layer);
+                                if (!capOpt) {
+                                    fireWebhook(std::nullopt);
+                                } else {
+                                    spawnScreenshotEncodeToPngThen(
+                                        std::move(*capOpt),
+                                        screenshotScalePercent(),
+                                        [=](std::optional<
+                                            std::vector<std::uint8_t>>
+                                            shot) {
+                                            fireWebhook(std::move(shot));
+                                        }
+                                    );
+                                }
+                            }
+                        }
+                        if (matchesLevelSession(
+                                sessionLevelID,
+                                sessionLevelName,
+                                sessionAttemptStart
+                            )) {
+                            levelSession().reset();
+                        }
+                    }
+                );
+                clearCheatState();
+                return;
+            } else {
+                auto fireWebhook =
+                    [=](std::optional<std::vector<std::uint8_t>> shot) {
+                        sendWebhook(
+                            pre.practice
+                                ? "notify-practice-complete"
+                                : "notify-level-complete",
+                            completeTitleSnapshot,
+                            fmt::format(
+                                "{} beat **{}** by **{}**!",
+                                playerName,
+                                display.levelName,
+                                display.creatorName
+                            ),
+                            completeColor,
+                            {
+                                {"Level", display.levelName, true},
+                                {"Creator", display.creatorName, true},
+                            },
+                            elapsed,
+                            std::move(shot)
+                        );
+                    };
+                if (!Mod::get()->getSettingValue<bool>(
+                        "screenshot-level-complete"
+                    )) {
+                    fireWebhook(std::nullopt);
+                } else {
+                    auto capOpt = capturePlayLayerScreenshotRgba(this);
+                    if (!capOpt) {
+                        fireWebhook(std::nullopt);
+                    } else {
+                        spawnScreenshotEncodeToPngThen(
+                            std::move(*capOpt),
+                            screenshotScalePercent(),
+                            [=](std::optional<
+                                std::vector<std::uint8_t>> shot) {
+                                fireWebhook(std::move(shot));
+                            }
+                        );
+                    }
+                }
+            }
+        }
+        clearCheatState();
+        levelSession().reset();
+    }
+    void onQuit() {
+        auto& session = levelSession();
+        if (!session.active) {
+            clearCompletedLevelExit(this);
+            PlayLayer::onQuit();
+            return;
+        }
+        if (consumeSentCompletedLevelExit(this)) {
+            PlayLayer::onQuit();
+            return;
+        }
+        syncPlayMode(this);
+        auto const playerName = getPlayerName();
+        auto const elapsed =
+            formatDurationMs(session.elapsedMilliseconds());
+        auto const display = resolveLevelDisplay(
+            session.levelID,
+            session.levelName,
+            session.creatorName
+        );
+        bool const suppress = display.redacted &&
+            Mod::get()->getSettingValue<bool>("suppress-redacted");
+        if (!suppress) {
+            sendWebhook(
+                session.settingKey(),
+                session.exitTitle(),
+                fmt::format(
+                    "{} exited **{}**.",
+                    playerName,
+                    display.levelName
+                ),
+                session.practice
+                    ? session.color()
+                    : embed_color::levelExit(),
+                {
+                    {"Level", display.levelName, true},
+                    {"Creator", display.creatorName, true},
+                },
+                elapsed
+            );
+        }
+        session.reset();
+        clearCompletedLevelExit(this);
+        PlayLayer::onQuit();
+    }
+    void destroyPlayer(PlayerObject* player, GameObject* object) {
+        bool const trackDeath =
+            Mod::get()->getSettingValue<bool>("notify-death");
+        int pctBefore = 0;
+        int bestBefore = 0;
+        if (trackDeath) {
+            pctBefore =
+                static_cast<int>(this->getCurrentPercent());
+            bestBefore = m_level
+                ? static_cast<int>(m_level->m_newNormalPercent2.value())
+                : 0;
+        }
+        PlayLayer::destroyPlayer(player, object);
+        resetSpeedhackSamples();
+        if (!m_fields->disabledCheat) {
+            m_fields->disabledCheat = object;
+        }
+        if (!m_fields->noclip && m_fields->disabledCheat != object &&
+            player && !player->m_isDead && !m_levelEndAnimationStarted) {
+            log::warn("Noclip detected");
+            m_fields->noclip = true;
+        }
+        syncPlayMode(this);
+        bool const progressLegal = isProgressLegal();
+        if (progressLegal) {
+            sendNewBestWebhookIfNeeded(this);
+        } else {
+            markCurrentBestHandled(this);
+        }
+        if (trackDeath && progressLegal) {
+            sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);
+        }
+    }
+    void postUpdate(float dt) {
+        checkSpeedhackDelta(dt);
+        PlayLayer::postUpdate(dt);
+    }
+    void updateTimeWarp(float timeWarp) {
+        PlayLayer::updateTimeWarp(timeWarp);
+        m_fields->currentTimeWarp = timeWarp;
+        resetSpeedhackSamples();
+    }
+};
+
+class $modify(MyEndLevelLayer, EndLevelLayer) {
+    void onMenu(CCObject* sender) {
+        sendCompletedLevelExitIfQueued(m_playLayer);
+        EndLevelLayer::onMenu(sender);
+    }
+
+    void onReplay(CCObject* sender) {
+        clearCompletedLevelExit(m_playLayer);
+        EndLevelLayer::onReplay(sender);
+    }
+
+    void onRestartCheckpoint(CCObject* sender) {
+        clearCompletedLevelExit(m_playLayer);
+        EndLevelLayer::onRestartCheckpoint(sender);
+    }
+};

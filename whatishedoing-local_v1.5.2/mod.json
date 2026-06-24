@@ -1,0 +1,396 @@
+{
+	"geode": "5.7.1",
+	"gd": {
+		"win": "2.2081",
+		"android": "2.2081",
+		"mac": "2.2081",
+		"ios": "2.2081"
+	},
+	"id": "imes.whatishedoing-local",
+	"name": "What is he doing? (Local Logger)",
+	"version": "v1.5.2",
+	"developer": "imes",
+	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
+	"dependencies": {
+		"cvolton.level-id-api": ">=v2.0.0",
+		"geode.node-ids": ">=v1.20.0"
+	},
+	"links": {
+		"community": "https://discord.gg/E8f6D6XqbW",
+		"source": "https://github.com/ItMe12s/whatishedoing"
+	},
+	"tags": [
+		"online",
+		"utility"
+	],
+	"settings": {
+		"profile-title": {
+			"type": "title",
+			"name": "Profile"
+		},
+		"profile-manager": {
+			"type": "button",
+			"name": "Profile Manager",
+			"description": "Save and load snapshots of mod settings across 10 renamed slots. Loading applies values immediately and closes open settings popups so they stick.",
+			"buttons": {
+				"manage": "Manage Profiles"
+			}
+		},
+		"webhook-title": {
+			"type": "title",
+			"name": "Discord Webhook"
+		},
+		"webhook-url": {
+			"type": "string",
+			"name": "Webhook URL",
+			"description": "HTTPS Discord webhook URL. Outbound messages are disabled only when this URL and every Extra Webhook URL below are empty.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		},
+		"webhook-username": {
+			"type": "string",
+			"name": "Webhook Display Name",
+			"description": "If set, overrides the webhook bot name on each message. Leave empty to use the name configured for this webhook in Discord (Server Settings -> Integrations).",
+			"default": ""
+		},
+		"test-webhook": {
+			"type": "bool",
+			"name": "Send Test Webhook",
+			"description": "Enable and apply to send a test message (then resets).",
+			"default": false
+		},
+		"max-retries": {
+			"type": "int",
+			"name": "Max Webhook Retries",
+			"description": "How many times to retry sending after a failed attempt.",
+			"default": 3,
+			"min": 0,
+			"max": 10
+		},
+		"blocking-webhook": {
+			"type": "bool",
+			"name": "Blocking request on exit (READ DESCRIPTION)",
+			"description": "YOU DON'T NEED THIS UNLESS YOU'RE HAVING ISSUES WITH IT NOT SENDING ON EXIT. If enabled, the \"Closed Geometry Dash\" message uses a blocking request so it is more likely to finish before the process ends. Can freeze the game for up to several tens of seconds in worst case. Not used for any other notification.",
+			"default": false
+		},
+		"player-name": {
+			"type": "string",
+			"name": "Player Name",
+			"description": "Name shown in each message. Empty uses \"He\".",
+			"default": "He"
+		},
+		"local-log-title": {
+			"type": "title",
+			"name": "Local Log File"
+		},
+		"log-destination": {
+			"type": "string",
+			"name": "Logging Destination",
+			"description": "Where this mod's notifications go. \"Discord + Local file\": send to your webhook(s) AND append to local_log.txt. \"Discord only\": normal webhook behavior. \"Local file only\": write the trace to local_log.txt and send nothing to Discord (no webhook request is made). All notification toggles, filters and redaction apply in every mode.",
+			"default": "Local file only",
+			"one-of": [
+				"Discord + Local file",
+				"Discord only",
+				"Local file only"
+			]
+		},
+		"log-open-file": {
+			"type": "button",
+			"name": "Local Log File",
+			"description": "Opens local_log.txt from this mod's config folder (created on first log). Screenshots are saved next to it in a \"screenshots\" subfolder, each named to match its log line timestamp.",
+			"buttons": {
+				"open": "Open Log File"
+			}
+		},
+		"notify-title": {
+			"type": "title",
+			"name": "Main Notification Toggles"
+		},
+		"notify-game-session": {
+			"type": "bool",
+			"name": "Notify on Opening/Exiting Geometry Dash",
+			"description": "Log when the game is opened and closed. Exit time is included in the close message if enabled.",
+			"default": true
+		},
+		"notify-play-level": {
+			"type": "bool",
+			"name": "Notify on Playing/Exiting a Level",
+			"description": "Log when a level is started and when the run is exited, including time in the level.",
+			"default": true
+		},
+		"notify-level-complete": {
+			"type": "bool",
+			"name": "Notify on Level Complete",
+			"description": "Log when a run completes and include time on that run.",
+			"default": true
+		},
+		"notify-practice-complete": {
+			"type": "bool",
+			"name": "Notify on Practice Complete",
+			"description": "Log when a practice run completes. Same info as level complete.",
+			"default": true
+		},
+		"notify-new-best": {
+			"type": "bool",
+			"name": "Notify on New Best",
+			"description": "Log when you achieve a new best on a level.",
+			"default": true
+		},
+		"new-best-min-percent": {
+			"type": "int",
+			"name": "Minimum New Best Percent",
+			"description": "Skip new best notifications below this percent. Set to 0 to send every new best.",
+			"default": 0,
+			"min": 0,
+			"max": 99
+		},
+		"notify-editor": {
+			"type": "bool",
+			"name": "Notify on Opening/Exiting the Editor",
+			"description": "Log when the editor is opened and when you leave the editor (save and play, save and exit, exit without save).",
+			"default": true
+		},
+		"notify-level-upload-title": {
+			"type": "title",
+			"name": "Level Upload Notification"
+		},
+		"notify-level-upload": {
+			"type": "bool",
+			"name": "Notify on Level Upload",
+			"description": "Log when you upload a new level",
+			"default": true
+		},
+		"upload-send-on-update": {
+			"type": "bool",
+			"name": "Send on Level Update",
+			"description": "Also send a notification when you update an existing level",
+			"default": true
+		},
+		"upload-use-custom-text": {
+			"type": "bool",
+			"name": "Use Custom Text",
+			"description": "Use your own message template instead of the default embed. Template file is customtextprofile1.txt through customtextprofile10.txt (see Manage Profiles). Slot 1 is used until you Load a profile from the manager, which switches which file is edited and used.",
+			"default": false
+		},
+		"upload-open-custom-text": {
+			"type": "button",
+			"name": "Custom Text",
+			"description": "Opens the active template file (customtextprofile1.txt ... customtextprofile10.txt) in your mod config folder. Load a profile in Manage Profiles to change which slot is active. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
+			"enable-if": "upload-use-custom-text",
+			"buttons": {
+				"edit": "Edit File"
+			}
+		},
+		"upload-role-ping": {
+			"type": "bool",
+			"name": "Role Ping",
+			"description": "Ping a role when a level is uploaded",
+			"default": false
+		},
+		"upload-role-id": {
+			"type": "string",
+			"name": "Role ID",
+			"description": "The Discord role ID to ping. In the preset this appears spoilered at the bottom. In custom text, place {role} wherever you want it!",
+			"default": "",
+			"filter": "0123456789"
+		},
+		"screenshot-toggles-title": {
+			"type": "title",
+			"name": "Screenshot Toggles"
+		},
+		"screenshot-level-complete": {
+			"type": "bool",
+			"name": "Screenshot on Level Complete",
+			"description": "Attach a screen capture to level complete webhooks (including practice and startpos segment completes).",
+			"default": true
+		},
+		"screenshot-new-best": {
+			"type": "bool",
+			"name": "Screenshot on New Best",
+			"description": "Attach a screen capture to new best webhooks.",
+			"default": true
+		},
+		"screenshot-death": {
+			"type": "bool",
+			"name": "Screenshot on Death",
+			"description": "Attach a screen capture to death webhooks (normal and startpos runs).",
+			"default": true
+		},
+		"screenshot-scale-percent": {
+			"type": "int",
+			"name": "Screenshot PNG Scale",
+			"description": "Output size as percent of captured resolution. Lower values means smaller PNGs and uploads.",
+			"default": 100,
+			"min": 25,
+			"max": 100,
+			"control": {
+				"slider": true,
+				"slider-step": 5,
+				"arrow-step": 5,
+				"big-arrow-step": 10
+			}
+		},
+		"other-notify-title": {
+			"type": "title",
+			"name": "Other Notification Toggles"
+		},
+		"notify-death": {
+			"type": "bool",
+			"name": "Notify on Death",
+			"description": "Normal mode only. Startpos: minimum segment, start-end percentage line. Skips when New Best already covers that death.",
+			"default": false
+		},
+		"cheat-detect": {
+			"type": "bool",
+			"name": "Detect Cheat/Noclip Runs",
+			"description": "Suppress progress webhooks when noclip, ignore damage, or speedhack is detected.",
+			"default": true
+		},
+		"death-min-percent": {
+			"type": "int",
+			"name": "Minimum Death Percent",
+			"description": "Skip death notifications below this percent. Set to 0 to send every death.",
+			"default": 40,
+			"min": 0,
+			"max": 99
+		},
+		"startpos-death-min-progress": {
+			"type": "int",
+			"name": "Minimum Startpos Progress Percent",
+			"description": "Minimum percentage points from that start to your death. Set to 0 to send every startpos death.",
+			"default": 20,
+			"min": 0,
+			"max": 99
+		},
+		"filter-title": {
+			"type": "title",
+			"name": "Level ID Filter"
+		},
+		"level-filter-mode": {
+			"type": "string",
+			"name": "Level ID Filter Mode",
+			"description": "All = send normally. Blacklist = redact identifying info (level name, creator, ID) for IDs in the list. Whitelist = redact for IDs NOT in the list.",
+			"default": "All",
+			"one-of": [
+				"All",
+				"Blacklist",
+				"Whitelist"
+			]
+		},
+		"level-filter-ids": {
+			"type": "string",
+			"name": "Level IDs (comma-separated)",
+			"description": "Use the toggle button on the level info page to add/remove levels. Or do it the old way by making a list in a note app and copy pasting it here. It will automatically filter out text for you too (e.g. \"1 Stereo Madness, 2 Back On Track\" -> \"1, 2\").",
+			"default": "",
+			"filter": "0123456789, "
+		},
+		"suppress-redacted": {
+			"type": "bool",
+			"name": "Don't Send Redacted Messages",
+			"description": "When on, any level message that would otherwise be sent as \"Private level\" (because of the filter mode above) is dropped entirely instead of sent. Use this for full privacy on filtered levels. Affects level start, exit, complete, death, new best, and editor open/exit.",
+			"default": false
+		},
+		"embed-colors-title": {
+			"type": "title",
+			"name": "Embed Colors"
+		},
+		"color-game-open": {
+			"type": "color",
+			"name": "Game Opened",
+			"description": "Embed accent color for the \"Opened Geometry Dash\" webhook.",
+			"default": "#3498DB"
+		},
+		"color-game-close": {
+			"type": "color",
+			"name": "Game Closed",
+			"description": "Embed accent color for the \"Closed Geometry Dash\" webhook.",
+			"default": "#992D22"
+		},
+		"color-test-webhook": {
+			"type": "color",
+			"name": "Test Webhook",
+			"description": "Embed accent color for the \"Test Webhook\" message sent when the Test Webhook setting is triggered.",
+			"default": "#2ECC71"
+		},
+		"color-editor-open": {
+			"type": "color",
+			"name": "Editor Opened",
+			"description": "Embed accent color for opening the editor (\"Opened the Editor\") and for the default \"New Level Uploaded\".",
+			"default": "#E67E22"
+		},
+		"color-editor-exit": {
+			"type": "color",
+			"name": "Editor Exited",
+			"description": "Embed accent color when leaving the editor (Save and Play, exit with/without save, etc.) and for the default \"Level Updated\".",
+			"default": "#E74C3C"
+		},
+		"color-new-best": {
+			"type": "color",
+			"name": "New Best",
+			"description": "Embed accent color for the \"New Best!\" webhook (new normal-mode best percent below 100%, after thresholds in settings).",
+			"default": "#F1C40F"
+		},
+		"color-level-complete": {
+			"type": "color",
+			"name": "Level Complete",
+			"description": "Embed accent color for normal-mode \"Level Complete!\" and startpos test-mode \"Startpos Complete!\". Practice completes use Practice Run instead.",
+			"default": "#FFD700"
+		},
+		"color-level-exit": {
+			"type": "color",
+			"name": "Level Exited",
+			"description": "Embed accent color when exiting a normal-mode run from the pause menu and endscreen (\"Exited a Level\"). Practice exits use Practice Run.",
+			"default": "#ED4245"
+		},
+		"color-death": {
+			"type": "color",
+			"name": "Death",
+			"description": "Embed accent color for \"Died\" webhooks (single percent or startpos segment).",
+			"default": "#C0392B"
+		},
+		"color-play-practice": {
+			"type": "color",
+			"name": "Practice Run",
+			"description": "Embed accent color for practice completion, pause-menu exit while in practice and endscreen exit after completing a practice run.",
+			"default": "#95A5A6"
+		},
+		"color-play-normal": {
+			"type": "color",
+			"name": "Normal Run",
+			"description": "Embed accent color for the \"Playing a Level\" webhook.",
+			"default": "#57F287"
+		},
+		"extra-webhook-urls-title": {
+			"type": "title",
+			"name": "Extra Webhook URLs"
+		},
+		"extra-webhook-url-1": {
+			"type": "string",
+			"name": "Extra Webhook URL 1",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		},
+		"extra-webhook-url-2": {
+			"type": "string",
+			"name": "Extra Webhook URL 2",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		},
+		"extra-webhook-url-3": {
+			"type": "string",
+			"name": "Extra Webhook URL 3",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		},
+		"extra-webhook-url-4": {
+			"type": "string",
+			"name": "Extra Webhook URL 4",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		}
+	}
+}
