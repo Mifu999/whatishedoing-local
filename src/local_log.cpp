@@ -33,7 +33,7 @@ std::mutex& logMutex() {
 }
 
 std::filesystem::path logFilePath() {
-    return Mod::get()->getConfigDir() / "local_log.txt";
+    return Mod::get()->getSaveDir() / "local_log.txt";
 }
 
 // Logging destination, parsed from the "log-destination" one-of setting.
@@ -54,7 +54,7 @@ LogMode currentMode() {
 }
 
 std::filesystem::path screenshotsDir() {
-    return Mod::get()->getConfigDir() / "screenshots";
+    return Mod::get()->getSaveDir() / "screenshots";
 }
 
 // Single local-time snapshot, reused so a log line and its screenshot filename
@@ -224,7 +224,7 @@ void openLogFile() {
         SW_SHOW
     );
 #else
-    utils::file::openFolder(Mod::get()->getConfigDir());
+    utils::file::openFolder(Mod::get()->getSaveDir());
 #endif
 }
 
