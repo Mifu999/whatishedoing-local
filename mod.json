@@ -6,9 +6,9 @@
 		"mac": "2.2081",
 		"ios": "2.2081"
 	},
-	"id": "imes.whatishedoing",
-	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.4.2",
+	"id": "imes.whatishedoing-local",
+	"name": "What is he doing? (Local Logger)",
+	"version": "v1.5.2",
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
@@ -78,6 +78,29 @@
 			"name": "Player Name",
 			"description": "Name shown in each message. Empty uses \"He\".",
 			"default": "He"
+		},
+		"local-log-title": {
+			"type": "title",
+			"name": "Local Log File"
+		},
+		"log-destination": {
+			"type": "string",
+			"name": "Logging Destination",
+			"description": "Where this mod's notifications go. \"Discord + Local file\": send to your webhook(s) AND append to local_log.txt. \"Discord only\": normal webhook behavior. \"Local file only\": write the trace to local_log.txt and send nothing to Discord (no webhook request is made). All notification toggles, filters and redaction apply in every mode.",
+			"default": "Local file only",
+			"one-of": [
+				"Discord + Local file",
+				"Discord only",
+				"Local file only"
+			]
+		},
+		"log-open-file": {
+			"type": "button",
+			"name": "Local Log File",
+			"description": "Opens local_log.txt from this mod's config folder (created on first log). Screenshots are saved next to it in a \"screenshots\" subfolder, each named to match its log line timestamp.",
+			"buttons": {
+				"open": "Open Log File"
+			}
 		},
 		"notify-title": {
 			"type": "title",

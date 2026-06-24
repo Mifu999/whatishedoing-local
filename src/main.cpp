@@ -4,6 +4,7 @@
 
 #include "embed_colors.hpp"
 #include "level_upload/open_file_setting.hpp"
+#include "local_log.hpp"
 #include "profile/popup.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
@@ -105,6 +106,17 @@ $on_mod(Loaded)
                     return;
                 }
                 level_upload::openCustomTextFileFromSettings();
+            }
+        )
+        .leak();
+
+    ButtonSettingPressedEventV3(Mod::get(), "log-open-file")
+        .listen(
+            [](std::string_view buttonKey) {
+                if (buttonKey != "open") {
+                    return;
+                }
+                local_log::openLogFile();
             }
         )
         .leak();

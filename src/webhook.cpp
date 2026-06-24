@@ -1,5 +1,7 @@
 #include "webhook.hpp"
 
+#include "local_log.hpp"
+
 #include <Geode/utils/async.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
@@ -447,6 +449,21 @@ void sendImpl(
     std::string const& footer,
     std::optional<std::vector<std::uint8_t>> screenshotPng
 ) {
+    bool const hasShot =
+        screenshotPng.has_value() && !screenshotPng->empty();
+
+    // Mirror the exact message we're about to send into the local log file.
+    // screenshotPng is read here (copied to disk if local logging is on) before
+    // it may be moved into the async send below. Done before any early-return so
+    // the local trace is written even when no webhook URL is configured.
+    local_log::logEmbed(title, description, fields, footer, screenshotPng);
+
+    // If the user chose "Local file only", skip Discord entirely: no targets
+    // are collected and no network request is made.
+    if (!local_log::discordEnabled()) {
+        return;
+    }
+
     auto urls = collectWebhookTargets();
     if (urls.empty()) {
         return;
@@ -460,9 +477,6 @@ void sendImpl(
     int const effectiveMaxRetries = useSync
         ? std::min(maxRetries, kSyncMaxRetries)
         : maxRetries;
-
-    bool const hasShot =
-        screenshotPng.has_value() && !screenshotPng->empty();
 
     if (hasShot) {
         auto payload = buildWebhookPayload(
@@ -548,6 +562,14 @@ matjson::Value buildContentWebhookPayload(std::string const& content) {
 }
 
 void sendContentImpl(std::string const& content) {
+    // Mirror the plain-content message into the local log file as well.
+    local_log::logContent(content);
+
+    // "Local file only" -> do not contact Discord.
+    if (!local_log::discordEnabled()) {
+        return;
+    }
+
     auto urls = collectWebhookTargets();
     if (urls.empty()) {
         return;

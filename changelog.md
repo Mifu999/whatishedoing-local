@@ -1,4 +1,17 @@
-# 1.4.2
+# 1.5.2
+
+- Local screenshots: when local logging is on, each captured screenshot is saved as a PNG in a **`screenshots`** subfolder next to `local_log.txt`, and the log line now shows the **file name** (e.g. `screenshot: 2026-06-24_21-30-05_0.png`) instead of a generic marker.
+
+## 1.5.1
+
+- **Logging Destination** option: choose **Discord + Local file**, **Discord only**, or **Local file only**. In "Local file only" no webhook request is made at all.
+- Repackaged as a **separate mod** (`imes.whatishedoing-local`) so it can be installed alongside the official mod and won't be overwritten by official updates. Has its own settings and its own `local_log.txt`.
+
+## 1.5.0
+
+- Optional **local log file**: mirror every notification to a plain text file (`local_log.txt` in the mod config folder), with the same messages, toggles and filters as the Discord webhook. Works even with no webhook URL set. Toggle it under **Local Log File** and open it with the **Open Log File** button.
+
+## 1.4.2
 
 - Seperate toggle for **Practice Run Complete!**
 
