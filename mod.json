@@ -6,10 +6,10 @@
 		"mac": "2.2081",
 		"ios": "2.2081"
 	},
-	"id": "imes.whatishedoing-local",
+	"id": "mifu.whatishedoing-local",
 	"name": "What is he doing? (Local Logger)",
 	"version": "v1.5.4",
-	"developer": "imes",
+	"developers": ["Mifuu", "imes"],
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
 		"cvolton.level-id-api": ">=v2.0.0",
