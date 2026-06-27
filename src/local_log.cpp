@@ -3,6 +3,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/utils/file.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <atomic>
@@ -11,6 +12,8 @@
 #include <mutex>
 #include <string>
 #include <system_error>
+#include <utility>
+#include <vector>
 
 #ifdef GEODE_IS_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -84,6 +87,77 @@ std::string currentLocalTimestamp() {
     return formatTm(nowLocalTm(), "%Y-%m-%d %H:%M:%S");
 }
 
+// Max number of screenshots to keep in the folder. 0 (or negative) = unlimited.
+int screenshotLimit() {
+    auto v = Mod::get()->getSettingValue<int64_t>("screenshot-limit");
+    if (v < 0) {
+        v = 0;
+    }
+    return static_cast<int>(v);
+}
+
+// Keep only the newest `limit` PNGs in the screenshots folder, deleting the
+// oldest by last-write time (filename as a stable tiebreaker). No-op when the
+// limit is 0/negative. Wrapped so a filesystem hiccup can never crash the game.
+void pruneOldScreenshots(std::filesystem::path const& dir, int limit) {
+    if (limit <= 0) {
+        return;
+    }
+    try {
+        std::vector<
+            std::pair<std::filesystem::file_time_type, std::filesystem::path>
+        > shots;
+        std::error_code ec;
+        for (auto const& entry :
+             std::filesystem::directory_iterator(dir, ec)) {
+            auto const& p = entry.path();
+            if (p.extension() != ".png") {
+                continue;
+            }
+            std::error_code fec;
+            if (!entry.is_regular_file(fec)) {
+                continue;
+            }
+            auto const t = std::filesystem::last_write_time(p, fec);
+            if (fec) {
+                continue;
+            }
+            shots.emplace_back(t, p);
+        }
+
+        if (static_cast<int>(shots.size()) <= limit) {
+            return;
+        }
+
+        std::sort(
+            shots.begin(),
+            shots.end(),
+            [](auto const& a, auto const& b) {
+                if (a.first != b.first) {
+                    return a.first < b.first; // oldest first
+                }
+                return a.second.filename().string()
+                    < b.second.filename().string();
+            }
+        );
+
+        std::size_t const toDelete =
+            shots.size() - static_cast<std::size_t>(limit);
+        for (std::size_t i = 0; i < toDelete; ++i) {
+            std::error_code dec;
+            std::filesystem::remove(shots[i].second, dec);
+            if (dec) {
+                log::warn(
+                    "Local log: could not delete old screenshot {}",
+                    shots[i].second.string()
+                );
+            }
+        }
+    } catch (std::exception const& e) {
+        log::warn("Local log: screenshot pruning failed: {}", e.what());
+    }
+}
+
 // Save already-encoded PNG bytes (the same bytes sent to Discord) into the
 // "screenshots" subfolder. Returns the file name only (no path), or an empty
 // string on failure. Filename base is the shared timestamp plus a monotonic
@@ -115,6 +189,10 @@ std::string saveScreenshotToDisk(
         );
         return {};
     }
+
+    // Enforce the rolling cap: delete the oldest screenshots if over the limit.
+    pruneOldScreenshots(dir, screenshotLimit());
+
     return path.filename().string();
 }
 
