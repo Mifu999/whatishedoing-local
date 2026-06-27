@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing-local",
 	"name": "What is he doing? (Local Logger)",
-	"version": "v1.5.2",
+	"version": "v1.5.4",
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
@@ -97,9 +97,21 @@
 		"log-open-file": {
 			"type": "button",
 			"name": "Local Log File",
-			"description": "Opens local_log.txt from this mod's config folder (created on first log). Screenshots are saved next to it in a \"screenshots\" subfolder, each named to match its log line timestamp.",
+			"description": "Opens local_log.txt from this mod's save folder (created on first log). Screenshots are saved next to it in a \"screenshots\" subfolder, each named to match its log line timestamp.",
 			"buttons": {
 				"open": "Open Log File"
+			}
+		},
+		"screenshot-limit": {
+			"type": "int",
+			"name": "Max Screenshots Kept",
+			"description": "Maximum number of screenshots to keep in the \"screenshots\" folder. When a new screenshot is saved and the folder goes over this number, the oldest screenshots are deleted automatically. Set to 0 for no limit (keep everything).",
+			"default": 0,
+			"min": 0,
+			"max": 100000,
+			"control": {
+				"arrow-step": 10,
+				"big-arrow-step": 100
 			}
 		},
 		"notify-title": {

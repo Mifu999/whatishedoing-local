@@ -1,4 +1,12 @@
-# 1.5.2
+# 1.5.4
+
+- **Max Screenshots Kept** option: cap how many screenshots are kept in the `screenshots` folder. When a new screenshot pushes the folder over the limit, the oldest ones (by date) are deleted automatically. Set to 0 for no limit.
+
+## 1.5.3
+
+- The local log (`local_log.txt`) and its `screenshots` folder are now written to the mod's **save folder** (`.../GeometryDash/geode/mods/imes.whatishedoing-local`, under AppData on Windows) instead of the `config` folder in the GD install directory.
+
+## 1.5.2
 
 - Local screenshots: when local logging is on, each captured screenshot is saved as a PNG in a **`screenshots`** subfolder next to `local_log.txt`, and the log line now shows the **file name** (e.g. `screenshot: 2026-06-24_21-30-05_0.png`) instead of a generic marker.
 
